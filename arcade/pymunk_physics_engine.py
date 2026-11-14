@@ -306,10 +306,10 @@ class PymunkPhysicsEngine:
                     my_body.velocity = pymunk.Vec2d(velocity, my_body.velocity.y)
 
             # Support max vertical velocity
-            if max_vertical_velocity:
+            if sprite.pymunk.max_vertical_velocity:
                 velocity = my_body.velocity[1]
-                if abs(velocity) > max_vertical_velocity:
-                    velocity = max_vertical_velocity * math.copysign(1, velocity)
+                if abs(velocity) > sprite.pymunk.max_vertical_velocity:
+                    velocity = sprite.pymunk.max_vertical_velocity * math.copysign(1, velocity)
                     my_body.velocity = pymunk.Vec2d(my_body.velocity.x, velocity)
 
         # Add callback if we need to do anything custom on this body
@@ -317,10 +317,10 @@ class PymunkPhysicsEngine:
         if body_type == self.DYNAMIC:
             body.velocity_func = velocity_callback
 
-        # Set the physics shape to the sprite's hitbox
-        poly = sprite.hit_box.points
-        scaled_poly = [[x * sprite.scale_x for x in z] for z in poly]
-        shape = pymunk.Poly(body, scaled_poly, radius=radius)  # type: ignore
+        # Set the physics shape to the sprite's hitbox. Each axis is scaled
+        # by the sprite's scale on that same axis so non-uniform scaling is
+        # preserved instead of stretching both axes by scale_x.
+        shape = self._create_shape(sprite, body, radius=radius)  # type: ignore
 
         # Set collision type, used in collision callbacks
         if collision_type:
@@ -605,10 +605,11 @@ class PymunkPhysicsEngine:
         Tried to update the shape for a Sprite which does not currently have a shape
         """
 
-        # Set the physics shape to the sprite's hitbox
-        poly = sprite.hit_box.points
-        scaled_poly = [[x * sprite.scale_x for x in z] for z in poly]
-        shape = pymunk.Poly(physics_object.body, scaled_poly, radius=old_shape.radius)  # type: ignore
+        # Set the physics shape to the sprite's hitbox, picking up the
+        # sprite's current per-axis scale.
+        shape = self._create_shape(  # type: ignore
+            sprite, physics_object.body, radius=old_shape.radius
+        )
 
         shape.collision_type = old_shape.collision_type
         shape.elasticity = old_shape.elasticity
@@ -617,6 +618,18 @@ class PymunkPhysicsEngine:
         self.space.remove(old_shape)
         self.space.add(shape)
         physics_object.shape = shape
+
+    def _create_shape(self, sprite: Sprite, body: pymunk.Body, radius: float = 0) -> pymunk.Poly:
+        """Build a pymunk polygon shape from the sprite's current hitbox.
+
+        The hitbox points are scaled per-axis by the sprite's own
+        :py:attr:`~arcade.Sprite.scale_x` and
+        :py:attr:`~arcade.Sprite.scale_y`, so non-uniform scaling produces
+        a correctly proportioned shape.
+        """
+        poly = sprite.hit_box.points
+        scaled_poly = [[point[0] * sprite.scale_x, point[1] * sprite.scale_y] for point in poly]
+        return pymunk.Poly(body, scaled_poly, radius=radius)
 
     def resync_sprites(self) -> None:
         """

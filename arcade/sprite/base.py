@@ -110,6 +110,22 @@ class BasicSprite:
         for sprite_list in self.sprite_lists:
             sprite_list._update_position(self)
 
+    def _update_physics_shapes(self) -> None:
+        """Refresh collision shapes after a scale change.
+
+        Physics engines register themselves through
+        :py:meth:`~arcade.Sprite.register_physics_engine`. Engines which can
+        rebuild a sprite's collision shape from its current hitbox, such as
+        :py:class:`~arcade.PymunkPhysicsEngine`, expose an ``update_sprite``
+        hook that is called here so a runtime scale change is propagated to
+        the already-registered collision shape instead of leaving it stale.
+        Other engines simply don't provide the hook and are skipped.
+        """
+        for engine in getattr(self, "physics_engines", ()):
+            update_sprite = getattr(engine, "update_sprite", None)
+            if update_sprite is not None:
+                update_sprite(self)
+
     @property
     def center_x(self) -> float:
         """Get or set the center x position of the sprite."""
@@ -167,6 +183,7 @@ class BasicSprite:
             self.update_spatial_hash()
             for sprite_list in self.sprite_lists:
                 sprite_list._update_width(self)
+            self._update_physics_shapes()
 
     @property
     def height(self) -> float:
@@ -183,6 +200,7 @@ class BasicSprite:
             self.update_spatial_hash()
             for sprite_list in self.sprite_lists:
                 sprite_list._update_height(self)
+            self._update_physics_shapes()
 
     @property
     def size(self) -> Point:
@@ -217,6 +235,7 @@ class BasicSprite:
 
             for sprite_list in self.sprite_lists:
                 sprite_list._update_size(self)
+            self._update_physics_shapes()
 
     @property
     def scale_x(self) -> float:
@@ -244,6 +263,7 @@ class BasicSprite:
         self.update_spatial_hash()
         for sprite_list in self.sprite_lists:
             sprite_list._update_size(self)
+        self._update_physics_shapes()
 
     @property
     def scale_y(self) -> float:
@@ -271,6 +291,7 @@ class BasicSprite:
         self.update_spatial_hash()
         for sprite_list in self.sprite_lists:
             sprite_list._update_size(self)
+        self._update_physics_shapes()
 
     @property
     def scale(self) -> Point2:
@@ -324,6 +345,7 @@ class BasicSprite:
         self.update_spatial_hash()
         for sprite_list in self.sprite_lists:
             sprite_list._update_size(self)
+        self._update_physics_shapes()
 
     @property
     def left(self) -> float:
@@ -712,6 +734,7 @@ class BasicSprite:
             sprite_list._update_size(self)
             if position_changed:
                 sprite_list._update_position(self)
+        self._update_physics_shapes()
 
     @warning(warning_type=ReplacementWarning, new_name="rescale_relative_to_point")
     def rescale_xy_relative_to_point(self, point: Point, factors_xy: Iterable[float]) -> None:
